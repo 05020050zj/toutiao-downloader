@@ -19,9 +19,11 @@ from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.label import Label
-from kivy.properties import StringProperty, NumericProperty
+from kivy.uix.widget import Widget
+from kivy.properties import StringProperty
 from kivy.clock import Clock
 from kivy.utils import platform
+from kivy.graphics import Color, Rectangle
 
 # ============================================================
 # 修复中文显示：注册中文字体
@@ -38,7 +40,6 @@ def register_chinese_font():
         '/system/fonts/NotoSansHans-Regular.otf',
         '/system/fonts/NotoSansCJKsc-Regular.otf',
         '/system/usr/share/fonts/NotoSansCJK/NotoSansCJKsc-Regular.otf',
-        '/storage/emulated/0/.fonts/NotoSansCJKsc-Regular.otf',
     ]
 
     for fp in android_font_paths:
@@ -61,7 +62,6 @@ def register_chinese_font():
                 # 下载中文字体
                 download_urls = [
                     'https://github.com/adobe-fonts/source-han-sans/raw/release/OTF/SimplifiedChinese/SourceHanSansSC-Regular.otf',
-                    'https://raw.githubusercontent.com/ArtifexSoftware/urw-base35-fonts/master/fonts/NimbusRoman-Regular.otf',
                 ]
                 for url in download_urls:
                     try:
@@ -79,11 +79,6 @@ def register_chinese_font():
         except:
             pass
 
-    # 3. 设置默认字体
-    if font_registered:
-        from kivy.core.text import DEFAULT_FONT
-        DEFAULT_FONT = 'NotoSansCJK'
-
     return font_registered
 
 
@@ -91,35 +86,33 @@ def register_chinese_font():
 # 主题颜色
 # ============================================================
 COLORS = {
-    'primary': (0.25, 0.47, 0.85, 1),       # 蓝色主色
-    'primary_dark': (0.18, 0.35, 0.63, 1),  # 深蓝
-    'success': (0.18, 0.74, 0.42, 1),       # 绿色
-    'danger': (0.91, 0.30, 0.24, 1),        # 红色
-    'warning': (1.0, 0.76, 0.03, 1),        # 黄色
-    'bg': (0.96, 0.96, 0.98, 1),            # 背景色
-    'card': (1.0, 1.0, 1.0, 1),             # 卡片白色
-    'text': (0.2, 0.2, 0.2, 1),             # 主文字
-    'text_light': (0.55, 0.55, 0.55, 1),    # 次要文字
-    'border': (0.88, 0.88, 0.90, 1),        # 边框
+    'primary': (0.25, 0.47, 0.85, 1),
+    'success': (0.18, 0.74, 0.42, 1),
+    'danger': (0.91, 0.30, 0.24, 1),
+    'warning': (1.0, 0.76, 0.03, 1),
+    'bg': (0.96, 0.96, 0.98, 1),
+    'card': (1.0, 1.0, 1.0, 1),
+    'text': (0.2, 0.2, 0.2, 1),
+    'text_light': (0.55, 0.55, 0.55, 1),
 }
 
 
 # ============================================================
-# 自定义组件
+# 带背景色的容器
 # ============================================================
-class RoundedButton(Button):
-    """圆角按钮"""
-    pass
+class ColoredBox(BoxLayout):
+    """可以设置背景色的 BoxLayout"""
+    def __init__(self, bg_color=(1,1,1,1), **kwargs):
+        super().__init__(**kwargs)
+        self.bg_color = bg_color
+        with self.canvas.before:
+            Color(*bg_color)
+            self.rect = Rectangle(pos=self.pos, size=self.size)
+        self.bind(pos=self._update_rect, size=self._update_rect)
 
-
-class CardLayout(BoxLayout):
-    """卡片容器"""
-    pass
-
-
-class StatusLabel(Label):
-    """状态标签"""
-    pass
+    def _update_rect(self, instance, value):
+        self.rect.pos = instance.pos
+        self.rect.size = instance.size
 
 
 # ============================================================
@@ -133,7 +126,7 @@ class ToutiaoDownloaderApp(App):
 
         # 注册中文字体
         self.font_ok = register_chinese_font()
-        font_name = 'NotoSansCJK' if self.font_ok else 'Roboto'
+        self.font_name = 'NotoSansCJK' if self.font_ok else 'Roboto'
 
         Window.clearcolor = COLORS['bg']
 
@@ -141,20 +134,15 @@ class ToutiaoDownloaderApp(App):
         root = BoxLayout(orientation='vertical', padding=0, spacing=0)
 
         # === 顶部标题栏 ===
-        header = BoxLayout(
+        header = ColoredBox(
+            bg_color=COLORS['primary'],
             size_hint_y=None, height='56dp',
             padding=[20, 0], spacing=10
         )
-        header.canvas.before.add_color_rectangle(
-            header.pos, header.size, COLORS['primary']
-        )
-        header.bind(pos=header.canvas.before.setter('pos'),
-                     size=header.canvas.before.setter('size'))
-
         title_label = Label(
             text="今日头条视频下载器",
             font_size='20sp',
-            font_name=font_name,
+            font_name=self.font_name,
             bold=True,
             color=(1, 1, 1, 1),
             halign='center',
@@ -171,18 +159,14 @@ class ToutiaoDownloaderApp(App):
         content.bind(minimum_height=content.setter('height'))
 
         # --- 提示卡片 ---
-        tip_card = BoxLayout(
+        tip_card = ColoredBox(
+            bg_color=COLORS['warning'],
             orientation='vertical', size_hint_y=None, height='44dp',
             padding=[16, 0]
         )
-        tip_card.canvas.before.add_color_rectangle(
-            tip_card.pos, tip_card.size, COLORS['warning']
-        )
-        tip_card.bind(pos=tip_card.canvas.before.setter('pos'),
-                       size=tip_card.canvas.before.setter('size'))
         tip_label = Label(
             text="支持粘贴分享文本 / 短链接 / 标准链接",
-            font_size='13sp', font_name=font_name,
+            font_size='13sp', font_name=self.font_name,
             color=(0.3, 0.3, 0.3, 1),
             halign='center', valign='middle'
         )
@@ -190,20 +174,15 @@ class ToutiaoDownloaderApp(App):
         tip_card.add_widget(tip_label)
         content.add_widget(tip_card)
 
-        # --- 输入框 ---
-        input_card = BoxLayout(
+        # --- 输入框卡片 ---
+        input_card = ColoredBox(
+            bg_color=COLORS['card'],
             orientation='vertical', size_hint_y=None, height='130dp',
             padding=[16, 12]
         )
-        input_card.canvas.before.add_color_rectangle(
-            input_card.pos, input_card.size, COLORS['card']
-        )
-        input_card.bind(pos=input_card.canvas.before.setter('pos'),
-                         size=input_card.canvas.before.setter('size'))
-
         input_label = Label(
             text="请输入链接或粘贴分享文本：",
-            font_size='14sp', font_name=font_name,
+            font_size='14sp', font_name=self.font_name,
             color=COLORS['text'], halign='left', valign='middle',
             size_hint_y=None, height='24dp'
         )
@@ -214,7 +193,7 @@ class ToutiaoDownloaderApp(App):
             hint_text="粘贴链接，例如：\nhttps://m.toutiao.com/is/xxxxx/",
             multiline=True,
             font_size='15sp',
-            font_name=font_name,
+            font_name=self.font_name,
             padding=[12, 10],
             background_color=(0.97, 0.97, 0.98, 1),
             foreground_color=COLORS['text'],
@@ -232,7 +211,7 @@ class ToutiaoDownloaderApp(App):
 
         self.parse_btn = Button(
             text="解析视频",
-            font_size='16sp', font_name=font_name,
+            font_size='16sp', font_name=self.font_name,
             background_color=COLORS['primary'],
             color=(1, 1, 1, 1),
             background_normal='',
@@ -242,7 +221,7 @@ class ToutiaoDownloaderApp(App):
 
         self.download_btn = Button(
             text="下载视频",
-            font_size='16sp', font_name=font_name,
+            font_size='16sp', font_name=self.font_name,
             background_color=COLORS['success'],
             color=(1, 1, 1, 1),
             background_normal='',
@@ -253,24 +232,20 @@ class ToutiaoDownloaderApp(App):
         content.add_widget(btn_row)
 
         # --- 视频信息卡片（解析后显示） ---
-        self.info_card = BoxLayout(
+        self.info_card = ColoredBox(
+            bg_color=COLORS['card'],
             orientation='vertical', size_hint_y=None, height=0,
             padding=[16, 12]
         )
-        self.info_card.canvas.before.add_color_rectangle(
-            self.info_card.pos, self.info_card.size, COLORS['card']
-        )
-        self.info_card.bind(pos=self.info_card.canvas.before.setter('pos'),
-                             size=self.info_card.canvas.before.setter('size'))
         self.info_title_label = Label(
-            text="", font_size='15sp', font_name=font_name,
+            text="", font_size='15sp', font_name=self.font_name,
             color=COLORS['text'], halign='left', valign='middle',
             size_hint_y=None, height='28dp'
         )
         self.info_title_label.bind(size=self.info_title_label.setter('text_size'))
         self.info_card.add_widget(self.info_title_label)
         self.info_detail_label = Label(
-            text="", font_size='13sp', font_name=font_name,
+            text="", font_size='13sp', font_name=self.font_name,
             color=COLORS['text_light'], halign='left', valign='middle',
             size_hint_y=None, height='22dp'
         )
@@ -281,27 +256,22 @@ class ToutiaoDownloaderApp(App):
         # --- 状态日志区域 ---
         log_label = Label(
             text="运行日志：",
-            font_size='13sp', font_name=font_name,
+            font_size='13sp', font_name=self.font_name,
             color=COLORS['text_light'], halign='left',
             size_hint_y=None, height='24dp'
         )
         log_label.bind(size=log_label.setter('text_size'))
         content.add_widget(log_label)
 
-        log_card = BoxLayout(
+        log_card = ColoredBox(
+            bg_color=(0.94, 0.94, 0.96, 1),
             orientation='vertical', size_hint_y=None, height='160dp',
             padding=[16, 10]
         )
-        log_card.canvas.before.add_color_rectangle(
-            log_card.pos, log_card.size, (0.94, 0.94, 0.96, 1)
-        )
-        log_card.bind(pos=log_card.canvas.before.setter('pos'),
-                       size=log_card.canvas.before.setter('size'))
-
         log_scroll = ScrollView(size_hint=(1, 1), do_scroll_x=False)
         self.log_label = Label(
             text=self.status_text,
-            font_size='13sp', font_name=font_name,
+            font_size='13sp', font_name=self.font_name,
             color=COLORS['text'],
             size_hint_y=None,
             text_size=(Window.width - 64, None),
@@ -316,7 +286,7 @@ class ToutiaoDownloaderApp(App):
         # --- 清空按钮 ---
         clear_btn = Button(
             text="清空",
-            font_size='14sp', font_name=font_name,
+            font_size='14sp', font_name=self.font_name,
             background_color=COLORS['danger'],
             color=(1, 1, 1, 1),
             background_normal='',
@@ -328,7 +298,7 @@ class ToutiaoDownloaderApp(App):
         # --- 底部信息 ---
         footer = Label(
             text="v1.0  |  视频保存到 Download 目录",
-            font_size='11sp', font_name=font_name,
+            font_size='11sp', font_name=self.font_name,
             color=COLORS['text_light'],
             halign='center', valign='middle',
             size_hint_y=None, height='28dp'
